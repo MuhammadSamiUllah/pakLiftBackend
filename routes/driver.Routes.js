@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Register route
+// In the register route
 router.post('/register', async (req, res) => {
   try {
     const { driverName, email, phone, cnic, password } = req.body;
@@ -26,7 +26,6 @@ router.post('/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    
     const verificationCode = Math.floor(100000 + Math.random() * 900000);
 
     const newDriver = new Driver({
@@ -40,27 +39,32 @@ router.post('/register', async (req, res) => {
 
     await newDriver.save();
 
-    // Send welcome email
+    // Send welcome email - FIXED: Using the email from request body
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: email,
-      verificationCode,
+      to: email, // This should be the email from the form
       subject: 'Welcome to Pak Lift!',
       html: `<h3>Hello ${driverName},</h3>
-             <h3> Here is your otp for driving verification ${verificationCode} <h3>
-             <p>Thank you for registering as a driver with us. We're excited to have you on board!</p>
-             <p>Best regards,<br/>Your App Team</p>`,
+             <h3>Here is your OTP for driving verification: ${verificationCode}</h3>
+             <p>Thank you for registering as a driver with us!</p>`,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
         console.error('Email error:', err);
       } else {
-        console.log('Email sent:', info.response);
+        console.log('Email sent to:', email); // Log which email was sent to
       }
     });
 
-    return res.status(201).json({ message: 'Driver registered successfully' });
+    return res.status(201).json({ 
+      message: 'Driver registered successfully',
+      driver: {
+        _id: newDriver._id,
+        email: newDriver.email,
+        driverName: newDriver.driverName
+      }
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });
@@ -135,22 +139,21 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+//Vehicle Details
 
-// Add vehicle details route
 router.post('/vehicle-details', upload.single('busImage'), async (req, res) => {
   try {
-    const { driverId, licenseNo, cnic, numberPlate } = req.body;
+    const { licenseNo,numberOfSeats, numberPlate } = req.body;
     
     if (!req.file) {
       return res.status(400).json({ message: 'Bus image is required' });
     }
 
     const newVehicle = new DriverVehicle({
-      driverId,
       licenseNo,
-      cnic,
+     numberOfSeats: parseInt(numberOfSeats),
       numberPlate,
-      busImage: req.file.path // or you can upload to cloud storage and store URL
+      busImage: req.file.path
     });
 
     await newVehicle.save();
